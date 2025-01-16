@@ -1,6 +1,8 @@
 # NBA Injury Patterns: A Time Series Analysis
 
-## Research Motivation
+> **Research Paper can be found in NBA-Injuries.pdf**
+
+## Motivation
 
 The NBA has significantly changed its playing style, medical practices, and season structure over the past two decades. Understanding injury patterns is crucial for team management, player health, and league scheduling. This study analyzes injury data from 2001-2023 to identify patterns that could help teams and medical staff better prepare for and possibly prevent injuries.
 
