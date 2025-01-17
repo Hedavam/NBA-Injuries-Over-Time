@@ -136,7 +136,7 @@ ggplot(months_per_year, aes(x=Year, y=Months_of_Data)) +
   geom_line() +
   geom_point() +
   theme_minimal() +
-  labs(title="Plot 1.2.1: Number of Months with Recorded Injuries by Year",
+  labs(title="Plot 1.2: Number of Months with Recorded Injuries by Year",
        y="Number of Months",
        x="Year") +
   scale_y_continuous(breaks = 1:12)
@@ -156,7 +156,7 @@ NBA_counts <- NBA_injuries_only %>%
   arrange(Year, Month)
 ```
 
-Plot 1.2.1 shows the varying number of months with recorded injuries across years. The inconsistency in monthly records necessitated our zero imputation approach to create a complete time series.
+Plot 1.2 shows the varying number of months with recorded injuries across years. The inconsistency in monthly records necessitated our zero imputation approach to create a complete time series.
 
 ## Time Series Creation
 
@@ -173,7 +173,7 @@ NBA_timeseries <- ts(NBA_imputed$Total_Entries,
                     frequency = 12)  
 ```
 
-For months with no recorded injuries, zeros were imputed. A missing month in our data indicates either no injuries or no games played. This zero imputation maintains a consistent monthly frequency (12) in our time series, enabling proper seasonal analysis. The time-series object is represented in Plot 1.3.1.
+For months with no recorded injuries, zeros were imputed. A missing month in our data indicates either no injuries or no games played. This zero imputation maintains a consistent monthly frequency (12) in our time series, enabling proper seasonal analysis. The time-series object is represented in Plot 1.3.
 
 ```{r ts-creation-evaluated, echo=FALSE, fig.width=8, fig.height=4}
 NBA_imputed <- NBA_counts %>%
@@ -191,7 +191,7 @@ NBA_timeseries <- ts(NBA_imputed$Total_Entries,
 
 # Plot the time series
 plot(NBA_timeseries, 
-     main = "Plot 1.3.1: NBA Injuries Over Time (Regular Season Only)",
+     main = "Plot 1.3: NBA Injuries Over Time (Regular Season Only)",
      ylab = "Number of Injuries",
      xlab = "Year")
 ```
@@ -266,7 +266,7 @@ rolling_sd <- rollapply(NBA_timeseries, width=window_size, FUN=sd, fill=NA)
 
 # Plot them together
 plot(NBA_timeseries, 
-     main="Plot 2.2.1: NBA Injuries with Rolling Statistics",
+     main="Plot 2.2: NBA Injuries with Rolling Statistics",
      ylab="Number of Injuries",
      type="l")
 lines(rolling_mean, col="red", lwd=2)
@@ -362,7 +362,7 @@ ggplot(plot_data_long, aes(x = date, y = value, color = model)) +
                              "arma" = "ARMA(1,1)",
                              "auto_arima" = paste("Auto ARIMA:", arimaorder(auto_model)[1:3]))) +
   theme_minimal() +
-  theme(legend.position = "top")
+  theme(legend.position = "top", element_text(hjust = 0.5))
 ```
 
 Based on these results, we selected the Auto ARIMA model (ARIMA(1,0,0)(0,1,2)\[12\]) for our final analysis. This model specification shows that for the non-seasonal part, we need one autoregressive term (1), no differencing (0), and no moving average terms (0). The seasonal component (0,1,2)\[12\] indicates we need one seasonal difference to handle yearly patterns, and two seasonal moving average terms at lag 12.
@@ -395,7 +395,7 @@ NBA_imputed$Number_of_Players[NBA_imputed$Total_Entries == 0] <- 0
 xreg <- NBA_imputed$Number_of_Players
 auto_model_reg <- auto.arima(NBA_timeseries, xreg = xreg)
 
-pacf(resid(auto_model_reg), main = "Plot 3.2: PACF of arima with an external regressor" )
+pacf(resid(auto_model_reg), main = "Plot 3.3: PACF of arima with an external regressor" )
 ```
 
 \newpage
@@ -431,7 +431,7 @@ ggplot() +
        x = "Year", 
        y = "Number of Injuries",
        color = "Type") +
-  theme(legend.position = "top")
+  theme(legend.position = "top",  theme(plot.title = element_text(hjust = 0.5)))
 ```
 
 Looking at the forecasted values (green line) for 2024-2028 in plot 4, our model predicts that NBA injuries will continue to follow the historical seasonal patterns. The model preserves the characteristic "double-peak" pattern we observed in the historical data, with injury rates typically spiking mid-season and near the end of regular season. However, there's a notable limitation in our forecast: it predicts injuries during the off-season months (around July-September), when no regular season games are played. The model's practical application would require adjusting these predictions to account for the actual NBA calendar, particularly by removing or adjusting the off-season predictions that shouldn't show significant injury counts.
@@ -468,24 +468,28 @@ NBA_imputed <- NBA_counts %>%
 
 ### Ordinary Least Squares (OLS)
 
-```{r ols-inference, echo=FALSE, fig.width=12, fig.height=8, fig.pos='H'}
+We first fit an OLS model, ```lm(Total_Entries ~ Year + Team)```, that uses the total number of injuries by year for each team as the response variable and then year and team as explanatory variables. We excluded interaction terms because believe overall trends in injury management will differ significantly by team. In theory, the NBA's medical policies would be applied uniformly even if some teams are overall better/worse or just unlucky with injuries. Additionally, excluding an interaction term allows for better interpretability.
+
+```{r ols-inference, echo=FALSE, fig.width=10, fig.height=6, fig.pos='H'}
 #display setup
 par(mfrow = c(2, 2))
 
 #model
-ols_fit <- lm(Total_Entries ~ Year + factor(Team), data = NBA_imputed)
+ols_fit <- lm(Total_Entries ~ Year + Team, data = NBA_imputed)
 
 #linearity, constant variance, normality assumptions & outliers
 plot(ols_fit)
-par(mfrow = c(1, 1))
 
 #set-up for independence assumptions, by group!
 residuals_by_team <- tibble(Team = NBA_imputed$Team, Residuals = resid(ols_fit))
 ```
 
-We fit an OLS model first that uses the total number of injuries by year for each team as the response variable and then year and team as explanatory variables. We excluded interaction term because believe overall trends in injury management will differ significantly by team. In theory, the NBA's medical policies would be applied uniformly even if some teams are overall better/worse or just unlucky with injuries. Additionally, excluding an interaction term allows for better interpretability.
+Shifting our focus to assess the assumptions of regression, linearity is satisfied as the LOESS line on the Residuals vs. Fitted model is fairly straight suggesting a lack of patterns in the residuals. However, constant variance might be violated as the errors for smaller fitted values are noticeably smaller compared to the error associated with larger fitted values. The slanted start to the LOESS line on the Scale-Location plot highlights this issue. Normality can also be questioned as the points towards the end of our reference line start to curve away from it.
 
-```{r ols-independence, eval=FALSE, echo=FALSE, fig.width=12, fig.height=10, fig.pos='H'}
+
+Lastly, as expected since this data is collected sequentially over time, independence is violated as we see an abundance on significant spikes on the ACF/PACF plots for many of the team-specific model residuals.
+
+```{r ols-independence, eval=FALSE, echo=FALSE, fig.width=12, fig.height=8, fig.pos='H'}
 for (team in unique(residuals_by_team$Team)) {
   team_residuals <- residuals_by_team %>%
     filter(Team == team) %>%
@@ -495,7 +499,7 @@ for (team in unique(residuals_by_team$Team)) {
 }
 ```
 
-```{r ols-questionable-team-PACFs, echo=FALSE, fig.pos='H'}
+```{r ols-questionable-team-PACFs, echo=FALSE, fig.width=12, fig.height=5.75, fig.pos='H'}
 par(mfrow = c(2, 4))
 
 questionable_team_PACFs <- c("Celtics", "Knicks", "Mavericks", "Nets", "Nuggets", "Pacers", 
@@ -515,48 +519,47 @@ for (team in questionable_team_PACFs) {
 }
 ```
 
-Shifting our focus to our assessment of the assumptions of regression, we see that linearity is satisfied as the LOESS line on the Residuals vs. Fitted model is fairly straight suggesting a lack of patterns in the residuals. However, constant variance might be violated as the errors for smaller fitted values are pretty small compared to the error associated with larger fitted values. The slanted start to the LOESS line on the Scale-Location plot highlights this issue. Normality is also questionable as the points towards the end of our reference line are slightly curved and pretty far way from it. Lastly, independence is violated as we see an abundance on significant spikes on the ACF/PACF plots for the residuals.
+\vspace{-1.85in}
 
-Given these violations of constant variance and independence assumptions, we turned to Generalized Least Squares (GLS), which can account for correlated error structures. To determine the appropriate error structure, we first used auto.arima() to identify the optimal ARMA(p,q) specification.
+Given these violations of constant variance and independence assumptions, we turned to Generalized Least Squares (GLS), which can account for correlated error structures. To determine the appropriate error structure, we first used ```auto.arima``` to identify the optimal ARMA(p,q) specification.
+
+\newpage
 
 ### ARIMA
 
-```{r ARIMA-results}
-xreg <- cbind(NBA_imputed$Year, factor(NBA_imputed$Team))
+```{r ARIMA-results, echo=FALSE}
+xreg <- cbind(NBA_imputed$Year, NBA_imputed$Team)
 arima_fit <- auto.arima(NBA_imputed$Total_Entries, xreg = xreg)
-cat("ARIMA", paste0(arima_fit$arma[c(1,6,2)], collapse=","))
+#cat("ARIMA", paste0(arima_fit$arma[c(1,6,2)], collapse=","))
 ```
 
 ```{r arima-inference, echo=FALSE}
 pacf(resid(arima_fit), main = "Plot 5.1.2: PACF of ARIMA(2,0,3) Residuals with External Regressors")
 ```
 
-The auto.arima function identified an ARIMA(2,0,3) model as the best fit for our data with external regressors. This specification indicates that the model uses two auto-regressive terms (p=2), no differencing (d=0), and three moving average terms (q=3). The PACF plot of the residuals (Plot 5.1.4) shows no significant spikes outside the confidence bounds, suggesting that this model adequately captures the temporal dependencies in our data. This lack of significant autocorrelation in the residuals indicates that the ARIMA(2,0,3) specification is appropriate for modeling the error structure in our subsequent GLS analysis.
+The ```auto.arima``` function identified an ARIMA(2,0,3) model as the best fit for our data with external regressors. This specification indicates that the model uses two auto-regressive terms (p=2), no differencing (d=0), and three moving average terms (q=3). The PACF plot of the residuals (Plot 5.1.2) shows no significant spikes outside the confidence bounds, suggesting that this model adequately captures the temporal dependencies in our data. This lack of significant autocorrelation in the residuals indicates that the ARIMA(2,0,3) specification is appropriate for modeling the error structure in our subsequent GLS analysis.
 
 ### Generalized Least Squares
 
 Using the ARMA(2,3) process obtained by ARIMA, we fit a GLS model that considers autocorrelation to be global over time, maintaining our assumption that the injury trends should behave similarly for all teams.
 
+With the included correlation structure, our GLS model does not have as much widespread residual autocorrelation as less teams have PACF plots with significant spikes.
+
+\vspace{-1in}
+
 ```{r gls-inference, echo=FALSE, fig.width=12, fig.height=10, fig.pos='H'}
-par(mfrow = c(2, 1))
+#modeling
 gls_fit <- gls(Total_Entries ~ Year + Team,
-                 correlation = corARMA(p = 2, q = 3, form = ~ 1 | Year),
+                 correlation = corARMA(p = 2, q = 3, form = ~ 1 | Team),
                  data = NBA_imputed,
                  method = "ML")
-
-#re-test independence
-acf(resid(gls_fit, type = "normalized"), main = "ACF for GLS residuals")
-pacf(resid(gls_fit, type = "normalized"), main = "PACF for GLS residuals")
-
-#analyze results
-anova(gls_fit) #!!
-
 #more results
-#summary(gls_fit)
-#confint(gls_fit)
+# summary(gls_fit)
+# confint(gls_fit)
 
 #set-up for independence
-residuals_by_team <- tibble(Team = NBA_imputed$Team, Residuals = resid(gls_fit, type = "normalized"))
+residuals_by_team <- tibble(Team = NBA_imputed$Team, 
+                            Residuals = resid(gls_fit, type = "normalized"))
 ```
 
 ```{r gls-independence, eval=FALSE, echo=FALSE}
@@ -570,10 +573,10 @@ for (team in unique(residuals_by_team$Team)) {
 }
 ```
 
-```{r gls-questionable-team-PACFs, echo=FALSE}
+```{r gls-questionable-team-PACFs, echo=FALSE, fig.pos='H'}
 par(mfrow = c(2, 3))
 
-questionable_team_PACFs <- c("Spurs", "Raptors", "Hawks", "Celtics", "Pelicans")
+questionable_team_PACFs <- c("Spurs", "Raptors", "Hawks", "Celtics", "Wizards")
 
 questionable_team_residuals <- residuals_by_team %>%
   filter(Team %in% questionable_team_PACFs) %>%
@@ -589,15 +592,38 @@ for (team in questionable_team_PACFs) {
 }
 ```
 
-With the included correlation structure, our GLS model does end up satisfying the independence assumption, with just one possibly significant spike coming at a very late lag.
+```{r anova-results, echo=FALSE}
+#analyze results
+library(xtable)
+library(kableExtra)
+
+anova_model <- anova(gls_fit)
+anova_table <- tibble(anova_model)
+
+# *AI generated code*
+anova_table$`p-value` <- ifelse(anova_table$`p-value` < 0.001, "< 0.001", sprintf("%.3g", anova_table$`p-value`))
+
+#pretty table
+anova_table %>%
+  kable(
+    format = "latex",
+    caption = "ANOVA Results",
+    digits = 3, 
+    align = "c"
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position"), 
+    position = "center", 
+    font_size = 10
+  )
+
+```
 
 We set up an anova test, with the null hypothesis being that the the number of injuries is not affected by the team after accounting for yearly trends. Using 0.05 as the significance level, the Team term is significant.
 
 So, we can reject our null hypothesis, meaning for these teams we observe injury rates that differ from the general norm, which cannot be attributed to chance.
 
-A closer look at the Celtics, Heat, and Spurs, some of the franchises that saw great success from 2000-2023, shows that they found ways to win despite being more affected by injuries. Based on the 95% Confidence Intervals for these teams that have p-values below the significance level, for any given year, being on the Heat/Celtics is associated with approximately 1-9 more injuries. This range jumps up to 5-13 for being on the Spurs. It seems like these teams found a way to win despite their injuries. Alternatively, their players may have had lots of minor injuries or mostly their rotation players got injured as opposed to key starters, or their injuries may have come in years they were not in title contention.
-
-Interestingly, the confidence intervals for any of the teams with significant p-values are never negative. So, it seems like no team was exceptionally lucky/capable of preventing injuries more than other teams.
+Looking at the 95% Confidence Intervals for teams that have p-values below the significance level, for any given year, being on the Pelicans is associated with approximately 3-6 less injuries. Meanwhile, the Heat experience an estimated 6-7 more yearly injuries. The Pelicans have never won a championship while the Heat were one of the most competitive in the recent 20 years. An observation like this suggests that, over time, success and injury rates may not be as closely tied as one might expect. 
 
 # Additional Inference: Recovery Times
 
@@ -657,7 +683,7 @@ Our time series analysis of NBA injuries from 2001 to 2023 revealed several sign
 
 Using an ARIMA(1,0,0)(0,1,2)\[12\] model, we were able to capture both these seasonal patterns and the overall trend. Our model's forecasts suggest these patterns will likely continue through 2024-2028, though with increasing uncertainty over time. Additionally, our analysis of recovery times showed a notable improvement after 2005, likely due to advancements in sports medicine and training practices.
 
-On the inference front, we tried to determine if injury rates differed by teams after accounting for yearly trends. Our simpler OLS modeling violated assumptions of regression, so we pivoted to a GLS model that accounted autocorrelation structures using auto.arima's() estimated ARMA model. After accounting for yearly trends, our t-test revealed that a few teams had significant higher injury rates than others, but, surprisingly, none had significant lower injury rates. The assumptions for regression associated with this model were arguably satisfied, possibly validating our observed results.
+On the inference front, we tried to determine if injury rates differed by teams after accounting for yearly trends. Our simpler OLS modeling violated assumptions of regression, so we pivoted to a GLS model that accounted autocorrelation structures using ```auto.arima's``` estimated ARMA model. After accounting for yearly trends, our t-test revealed that a few teams had significant higher injury rates than others, but, surprisingly, none had significant lower injury rates. The assumptions for regression associated with this model were arguably satisfied, possibly validating our observed results.
 
 These findings have practical implications for team management and medical staff. The consistent seasonal patterns suggest opportunities for proactive injury prevention, particularly during high-risk periods of December-January. However, the model's limitations, including its inability to account for remaining serial correlation, indicate that additional factors beyond temporal patterns influence injury rates in the NBA.
 
@@ -689,7 +715,7 @@ For inference, we explored Ordinary Least Squares (OLS) and Generalized Least Sq
 
 **Forecasting:**
 
-For forecasting, despite using the auto.arima model, the PACF and ACF plots indicate leftover serial autocorrelation in the residuals. This suggests that the model may not fully capture the underlying structure of the data. One potential reason for this is that we are fitting the raw time series data without incorporating additional relevant regressors, such as team-specific factors, training regimens, or changes in scheduling. These missing variables could account for some of the remaining autocorrelation, and their inclusion might improve model fit and forecast accuracy. Therefore, the inability to account for these external influences is a limitation of our current model.
+For forecasting, despite using the ```auto.arima``` model, the PACF and ACF plots indicate leftover serial autocorrelation in the residuals. This suggests that the model may not fully capture the underlying structure of the data. One potential reason for this is that we are fitting the raw time series data without incorporating additional relevant regressors, such as team-specific factors, training regimens, or changes in scheduling. These missing variables could account for some of the remaining autocorrelation, and their inclusion might improve model fit and forecast accuracy. Therefore, the inability to account for these external influences is a limitation of our current model.
 
 ### Other Considerations
 
@@ -949,7 +975,7 @@ NBA_imputed <- NBA_counts %>%
 par(mfrow = c(2, 2))
 
 # model
-ols_fit <- lm(Total_Entries ~ Year + factor(Team), data = NBA_imputed)
+ols_fit <- lm(Total_Entries ~ Year + Team, data = NBA_imputed)
 
 # linearity, constant variance, normality assumptions & outliers
 plot(ols_fit)
@@ -963,7 +989,7 @@ pacf(resid(ols_fit), main = "PACF for OLS residuals")
 library(forecast)
 
 # external regressors of team, year
-xreg <- cbind(NBA_imputed$Year, factor(NBA_imputed$Team))
+xreg <- cbind(NBA_imputed$Year, NBA_imputed$Team)
 
 arima_fit <- auto.arima(NBA_imputed$Total_Entries, xreg = xreg)
 
@@ -975,7 +1001,7 @@ pacf(resid(arima_fit))
 
 ## GLS inference
 gls_fit <- gls(Total_Entries ~ Year + Team,
-                 correlation = corARMA(p = 2, q = 3, form = ~ 1 | Year),
+                 correlation = corARMA(p = 2, q = 3, form = ~ 1 | Team),
                  data = NBA_imputed,
                  method = "ML")
 
